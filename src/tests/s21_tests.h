@@ -1,0 +1,99 @@
+#ifndef S21_TESTS_H
+#define S21_TESTS_H
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <ctime>
+#include <functional>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <type_traits>
+
+#include "../s21_containers.h"
+#include "../s21_containersplus.h"
+
+template <typename _T, typename = void>
+struct is_iterable : std::false_type {};
+
+template <typename _T>
+struct is_iterable<_T, std::void_t<decltype(std::declval<_T>().begin()),
+                                   decltype(std::declval<_T>().end())>>
+    : std::true_type {};
+
+bool __loop_test(std::function<bool(std::size_t)> &__fn,
+                 std::size_t __tests_count = 100);
+
+template <typename _LContainer, typename _RContainer,
+          typename value_type = typename _LContainer::value_type>
+typename std::enable_if<
+    is_iterable<_LContainer>::value && is_iterable<_RContainer>::value &&
+        std::is_same<value_type, typename _RContainer::value_type>::value,
+    void>::type
+__fill(_LContainer &__lhs, _RContainer &__rhs, std::size_t __max_size = 500,
+       value_type __max_value = std::numeric_limits<value_type>::max()) {
+  std::size_t __size = __max_size;
+  for (std::size_t __i = 0; __i < __size; __i++) {
+    value_type __r = static_cast<value_type>(std::rand() % __max_value);
+
+    __lhs.insert(__r);
+    __rhs.insert(__r);
+  }
+}
+
+template <
+    typename _LContainer, typename _RContainer,
+    typename = typename std::enable_if<is_iterable<_LContainer>::value &&
+                                       is_iterable<_RContainer>::value>::type>
+bool __cmp(_LContainer &__lhs, _RContainer &__rhs) {
+  static_assert(std::is_same<typename _LContainer::value_type,
+                             typename _RContainer::value_type>::value,
+                "Containers must have same types");
+
+  typename _LContainer::iterator it = __lhs.begin();
+  typename _RContainer::iterator jt = __rhs.begin();
+
+  while (it != __lhs.end() && jt != __rhs.end()) {
+    if (*it != *jt) {
+      return false;
+    }
+    it++;
+    jt++;
+  }
+
+  return it == __lhs.end() && jt == __rhs.end();
+}
+
+template <typename _Tp, typename _Up>
+typename std::enable_if_t<std::is_integral_v<std::remove_const_t<_Tp>> &&
+                              std::is_integral_v<std::remove_const_t<_Up>>,
+                          std::ostream &>
+operator<<(std::ostream &os, const std::pair<_Tp, _Up> &p) {
+  return os << p.first << " -- " << p.second;
+}
+
+template <typename _Container,
+          typename value_type = typename _Container::value_type>
+typename std::enable_if<is_iterable<_Container>::value &&
+                            !std::is_same<std::string, _Container>::value,
+                        std::ostream &>::type
+operator<<(std::ostream &os, _Container &__c) {
+  os << "[ ";
+  for (typename _Container::const_iterator __it = __c.begin();
+       __it != __c.end(); __it++) {
+    os << *__it << (std::next(__it) != __c.end() ? " | " : "");
+  }
+  return os << " ]\n";
+}
+
+class StackTester : public ::testing::Test {
+ public:
+  s21::stack<int> __s;
+
+  void SetUp() {}
+
+  void TearDown() {}
+};
+
+#endif
